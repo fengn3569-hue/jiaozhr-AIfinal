@@ -224,3 +224,58 @@ def m3_train_models(df):
 
     print("模型评估完成！Loss 曲线已保存至 outputs/5_nn_loss_curve.png")
     return rf_model, nn_model
+
+# ==========================================
+# M4: 问答接口模块
+# ==========================================
+def m4_qa_system(df):
+    print("\n" + "=" * 50)
+    print(" 欢迎使用城市出租车智能问答系统 ")
+    print("支持的问题类型例如：")
+    print("1. 几点最容易打车？ (时段查询)")
+    print("2. 哪个区域打车人最多？ (区域排名)")
+    print("3. 车费一般和什么有关？ (影响因素)")
+    print("4. 高峰期和非高峰期车速差多少？ (数据洞察)")
+    print("5. 周末的订单量大概是多少？ (统计查询)")
+    print("输入 '退出' 结束问答。")
+    print("=" * 50)
+
+    while True:
+        question = input("\n请提出你的出行问题：")
+        if question.lower() in ['退出', 'exit', 'quit']:
+            print("感谢使用，再见！")
+            break
+
+        # 匹配规则 1：时段查询
+        if re.search(r'(几点|时间|时段).*(打车|订单|多)', question):
+            peak_hour = df['pickup_hour'].value_counts().idxmax()
+            print(f" 结论：根据数据，每天的 {peak_hour}:00 是打车需求量最大的时间段。")
+            print(" 相关图表路径： outputs/1_hourly_demand.png")
+
+        # 匹配规则 2：区域排名
+        elif re.search(r'(区域|哪里|地点).*(最多|排)', question):
+            top_zone = df['PULocationID'].value_counts().idxmax()
+            print(f" 结论：上客量最高的区域 ID 是 {top_zone}。")
+            print(" 相关图表路径： outputs/2_top_10_pickup_zones.png")
+
+        # 匹配规则 3：费用关系
+        elif re.search(r'(车费|钱|费用).*(关系|因素|有关)', question):
+            corr = df['trip_distance'].corr(df['fare_amount'])
+            print(f" 结论：车费与行程距离呈高度正相关（相关系数: {corr:.2f}）。")
+            print(" 相关图表路径： outputs/3_distance_vs_fare.png")
+
+        # 匹配规则 4：速度洞察
+        elif re.search(r'(速度|车速|高峰期)', question):
+            peak_speed = df[df['is_peak'] == 1]['trip_speed_mph'].mean()
+            non_peak_speed = df[df['is_peak'] == 0]['trip_speed_mph'].mean()
+            print(f" 结论：高峰期平均车速为 {peak_speed:.1f} mph，非高峰期为 {non_peak_speed:.1f} mph。")
+            print(" 相关图表路径： outputs/4_speed_analysis.png")
+
+        # 匹配规则 5：统计查询
+        elif re.search(r'(周末|工作日).*(订单|打车)', question):
+            weekend_count = len(df[df['is_weekend'] == 1])
+            weekday_count = len(df[df['is_weekend'] == 0])
+            print(f" 结论：数据集中周末订单量为 {weekend_count} 条，工作日订单量为 {weekday_count} 条。")
+
+        else:
+            print("抱歉，目前的系统还无法理解这个问题，请尝试换一种包含核心关键词的问法。")
