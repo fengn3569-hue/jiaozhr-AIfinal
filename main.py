@@ -79,3 +79,54 @@ def m1_data_processing(filepath):
     df['fare_per_mile'] = df['fare_amount'] / df['trip_distance']
 
     return df
+
+# ==========================================
+# M2: 分析可视化模块
+# ==========================================
+def m2_visualization(df):
+    print("\n>>> [M2] 开始生成分析可视化图表...")
+
+    # 1. 出行需求时间规律 (分小时平均订单量)
+    plt.figure(figsize=(10, 5))
+    hourly_demand = df.groupby('pickup_hour').size()
+    plt.plot(hourly_demand.index, hourly_demand.values, marker='o', linestyle='-', color='b')
+    plt.title('24小时出行需求平均订单量')
+    plt.xlabel('小时 (0-23)')
+    plt.ylabel('订单量')
+    plt.grid(True)
+    plt.savefig('outputs/1_hourly_demand.png')
+    plt.close()
+
+    # 2. 区域热度分析 (上客量最高的 TOP 10 区域)
+    plt.figure(figsize=(10, 5))
+    top_10_zones = df['PULocationID'].value_counts().head(10)
+    top_10_zones.plot(kind='bar', color='orange')
+    plt.title('上客量最高的 TOP 10 区域')
+    plt.xlabel('区域 ID (PULocationID)')
+    plt.ylabel('订单量')
+    plt.xticks(rotation=45)
+    plt.savefig('outputs/2_top_10_pickup_zones.png')
+    plt.close()
+
+    # 3. 车费影响因素分析 (行程距离-车费散点图，采样以提高绘图速度)
+    plt.figure(figsize=(8, 6))
+    sample_df = df.sample(n=10000, random_state=42)  # 采样1万条避免点叠在一起
+    plt.scatter(sample_df['trip_distance'], sample_df['fare_amount'], alpha=0.3, s=5)
+    plt.title('行程距离与车费关系散点图 (1万条抽样)')
+    plt.xlabel('行程距离 (英里)')
+    plt.ylabel('车费金额 (美元)')
+    plt.savefig('outputs/3_distance_vs_fare.png')
+    plt.close()
+
+    # 4. 自选分析：不同星期几的高峰期与非高峰期平均车速对比
+    plt.figure(figsize=(10, 5))
+    speed_analysis = df.groupby(['weekday', 'is_peak'])['trip_speed_mph'].mean().unstack()
+    speed_analysis.columns = ['非高峰期', '高峰期']
+    speed_analysis.index = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    speed_analysis.plot(kind='bar', figsize=(10, 5))
+    plt.title('星期与高峰状态对平均车速的影响')
+    plt.ylabel('平均车速 (mph)')
+    plt.xticks(rotation=0)
+    plt.savefig('outputs/4_speed_analysis.png')
+    plt.close()
+    print("图表已全部保存至 outputs/ 目录。")
