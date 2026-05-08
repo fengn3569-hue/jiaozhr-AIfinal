@@ -279,3 +279,17 @@ def m4_qa_system(df):
 
         else:
             print("抱歉，目前的系统还无法理解这个问题，请尝试换一种包含核心关键词的问法。")
+
+# ==========================================
+# 主程序入口
+# ==========================================
+if __name__ == "__main__":
+    filepath = 'data/yellow_tripdata_2023-01.parquet'
+
+    # 运行全流程
+    df_cleaned = m1_data_processing(filepath)
+
+    if df_cleaned is not None:
+        m2_visualization(df_cleaned)
+        m3_train_models(df_cleaned)
+        m4_qa_system(df_cleaned)
