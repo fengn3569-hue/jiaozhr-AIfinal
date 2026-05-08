@@ -130,3 +130,97 @@ def m2_visualization(df):
     plt.savefig('outputs/4_speed_analysis.png')
     plt.close()
     print("图表已全部保存至 outputs/ 目录。")
+
+# ==========================================
+# M3: 预测模型模块
+# ==========================================
+# 定义简单的神经网络
+class DemandPredictor(nn.Module):
+    def __init__(self):
+        super(DemandPredictor, self).__init__()
+        self.fc1 = nn.Linear(3, 32)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(32, 16)
+        self.fc3 = nn.Linear(16, 1)
+
+    def forward(self, x):
+        x = self.relu(self.fc1(x))
+        x = self.relu(self.fc2(x))
+        return self.fc3(x)
+
+
+def m3_train_models(df):
+    print("\n>>> [M3] 开始构建并训练预测模型 (神经网络 vs 随机森林)...")
+
+    # 准备数据集：预测某区域(PULocationID)某时段(hour, weekday)的出行需求量(订单数)
+    # 按天、小时、区域聚合数据
+    df['pickup_date'] = df['tpep_pickup_datetime'].dt.date
+    demand_df = df.groupby(['pickup_date', 'pickup_hour', 'weekday', 'PULocationID']).size().reset_index(name='demand')
+
+    # 为了避免新手电脑内存溢出，我们选取需求量最大的Top 5个区域进行预测训练
+    top_zones = demand_df['PULocationID'].value_counts().head(5).index
+    demand_df = demand_df[demand_df['PULocationID'].isin(top_zones)]
+
+    X = demand_df[['pickup_hour', 'weekday', 'PULocationID']].values
+    y = demand_df['demand'].values
+
+    # 划分训练集和测试集 (8:2)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # 1. 训练随机森林 (作为对比基准)
+    print("训练随机森林模型...")
+    rf_model = RandomForestRegressor(n_estimators=50, random_state=42)
+    rf_model.fit(X_train, y_train)
+    rf_preds = rf_model.predict(X_test)
+    rf_mae = mean_absolute_error(y_test, rf_preds)
+    rf_rmse = np.sqrt(mean_squared_error(y_test, rf_preds))
+    print(f"[随机森林] 测试集 MAE: {rf_mae:.2f}, RMSE: {rf_rmse:.2f}")
+
+    # 2. 训练 PyTorch 神经网络
+    print("训练 PyTorch 神经网络...")
+    X_train_tensor = torch.FloatTensor(X_train)
+    y_train_tensor = torch.FloatTensor(y_train).view(-1, 1)
+    X_test_tensor = torch.FloatTensor(X_test)
+    y_test_tensor = torch.FloatTensor(y_test).view(-1, 1)
+
+    train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+
+    nn_model = DemandPredictor()
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(nn_model.parameters(), lr=0.01)
+
+    epochs = 20
+    losses = []
+
+    for epoch in range(epochs):
+        epoch_loss = 0
+        for batch_X, batch_y in train_loader:
+            optimizer.zero_grad()
+            outputs = nn_model(batch_X)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+        losses.append(epoch_loss / len(train_loader))
+
+    # 绘制 Loss 曲线
+    plt.figure(figsize=(8, 5))
+    plt.plot(range(1, epochs + 1), losses, marker='o')
+    plt.title('神经网络训练 Loss 曲线')
+    plt.xlabel('Epoch')
+    plt.ylabel('MSE Loss')
+    plt.savefig('outputs/5_nn_loss_curve.png')
+    plt.close()
+
+    # 评估神经网络
+    nn_model.eval()
+    with torch.no_grad():
+        nn_preds = nn_model(X_test_tensor).numpy()
+
+    nn_mae = mean_absolute_error(y_test, nn_preds)
+    nn_rmse = np.sqrt(mean_squared_error(y_test, nn_preds))
+    print(f"[神经网络] 测试集 MAE: {nn_mae:.2f}, RMSE: {nn_rmse:.2f}")
+
+    print("模型评估完成！Loss 曲线已保存至 outputs/5_nn_loss_curve.png")
+    return rf_model, nn_model
